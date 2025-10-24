@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Twitter</title>
+<style>
+  :root {
+      --bg-color: #e6ecf0;
+      --text-color: #14171a;
+      --tweet-bg: white;
+      --sidebar-bg: white;
+      --rightbar-bg: white;
+      --header-bg: #1da1f2;
+  }
+  body { margin:0; font-family:Arial,sans-serif; background-color: var(--bg-color); color: var(--text-color); }
+  body.dark-mode { --bg-color: #15202b; --text-color: #e1e8ed; --tweet-bg: #192734; --sidebar-bg: #192734; --rightbar-bg: #192734; --header-bg: #1da1f2; }
+  body.theme-retro { --bg-color:#fffbe6; --text-color:#333; --tweet-bg:#fff3cd; --sidebar-bg:#fffbe6; --rightbar-bg:#fffbe6; --header-bg:#ffcc00; }
+  body.theme-neon { --bg-color:#0f0f1a; --text-color:#00ffcc; --tweet-bg:#1a1a2e; --sidebar-bg:#1a1a2e; --rightbar-bg:#1a1a2e; --header-bg:#00ffcc; }
+
+  a { text-decoration:none; color: inherit; }
+  header { background-color: var(--header-bg); color:white; padding:10px; display:flex; justify-content:space-between; align-items:center; }
+  header nav a { margin-right:10px; }
+  .container { display:flex; flex-wrap:wrap; padding:10px; gap:10px; }
+  .sidebar { width:200px; background-color: var(--sidebar-bg); padding:10px; border-radius:8px; }
+  .rightbar { width:250px; background-color: var(--rightbar-bg); padding:10px; border-radius:8px; }
+  .feed { flex:1; min-width:300px; }
+
+  .tweet-box { background-color: var(--tweet-bg); padding:15px; border-radius:8px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.1); display:flex; flex-direction:column; position:sticky; top:10px; z-index:5; }
+  .tweet-box textarea { width:100%; padding:8px; border-radius:8px; border:1px solid #ccc; resize:none; }
+
+  .tweet { padding:10px; border-radius:8px; transition: background 0.2s, box-shadow 0.2s; cursor:default; display:flex; gap:10px; margin-bottom:10px; }
+  .tweet:hover { background-color: rgba(29,161,242,0.05); box-shadow:0 2px 8px rgba(0,0,0,0.1); cursor:pointer; }
+  .tweet img { width:48px; height:48px; border-radius:50%; }
+  .tweet-content { flex:1; display:flex; flex-direction:column; }
+  .tweet-header { display:flex; justify-content:space-between; align-items:center; font-size:14px; }
+  .tweet-details { font-size:12px; color:#657786; margin-top:5px; display:flex; gap:10px; }
+  .tweet-actions { opacity:0; transition: opacity 0.2s; display:flex; gap:15px; margin-top:5px; }
+  .tweet:hover .tweet-actions { opacity:1; }
+  .tweet-actions span { transition: transform 0.2s, color 0.2s; display:inline-flex; align-items:center; cursor:pointer; }
+
+  .tweet-actions span.animate { transform:scale(1.5); color:#e0245e; }
+  .tweet-actions span.retweet.animate { color:#17bf63; }
+
+  .reply-box { position:relative; display:none; flex-direction:column; margin-top:5px; }
+  .reply-box textarea { width:100%; padding:5px; border-radius:5px; border:1px solid #ccc; resize:none; transition: border-color 0.2s, box-shadow 0.2s; }
+  .reply-box textarea:hover { border-color:#1da1f2; box-shadow:0 1px 5px rgba(29,161,242,0.2); }
+  .typing-indicator { font-style:italic; color:#657786; font-size:12px; margin-top:5px; }
+  body.dark-mode .typing-indicator { color:#8899a6; }
+
+  .profile-sidebar { background-color: var(--rightbar-bg); color: var(--text-color); text-align:center; padding:15px; border-radius:8px; margin-bottom:20px; }
+  .profile-sidebar img { width:80px; height:80px; border-radius:50%; margin-bottom:10px; }
+  .profile-sidebar button { background-color:#1da1f2; color:white; border:none; border-radius:20px; padding:5px 15px; cursor:pointer; transition: background 0.2s; }
+  .profile-sidebar button:hover { background-color:#0d8ddb; }
+
+  .trends h3, .bookmarks h3 { margin-bottom:5px; }
+  .trends ul, .bookmarks ul { list-style:none; padding-left:0; }
+  .trends li, .bookmarks li { margin-bottom:5px; transition: transform 0.2s, background-color 0.2s; padding:5px; border-radius:5px; cursor:pointer; }
+  .trends li:hover, .bookmarks li:hover { transform:scale(1.05); background-color: rgba(29,161,242,0.1); }
+
+  @keyframes newTweetFlash { 0%{background-color:#fff3cd;}50%{background-color:#ffeeba;}100%{background-color:var(--tweet-bg);} }
+  .tweet.new-highlight { animation:newTweetFlash 1s ease-out; }
+
+  .tweet.scheduled { animation: slideIn 0.5s ease-out; }
+  @keyframes slideIn { 0% { opacity:0; transform: translateY(-20px); } 100% { opacity:1; transform: translateY(0); } }
+
+  .tweet-actions span.bookmark-animate { animation: pop 0.3s ease-out; }
+  @keyframes pop { 0%{transform:scale(1);}50%{transform:scale(1.5);}100%{transform:scale(1);} }
+
+  #scrollTopBtn { position:fixed; bottom:30px; right:30px; padding:10px 15px; border:none; border-radius:50%; background-color:#1da1f2; color:white; font-size:20px; cursor:pointer; display:none; box-shadow:0 2px 6px rgba(0,0,0,0.3); z-index:1000; }
+  #scrollTopBtn:hover { background-color:#0d8ddb; }
+
+  @media(max-width:768px){ .container{flex-direction:column;margin:10px;} .sidebar,.rightbar{width:100%;margin-bottom:10px;} .feed{width:100%;} .tweet,.tweet-box{flex-direction:column;} .reply-box{position:relative;width:100%;} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MiniTwitter</h1>
+  <nav>
+    <a href="#">Home</a>
+    <a href="#">Notifications <span id="notifCount">2</span></a>
+    <a href="#">Messages <span id="msgCount">1</span></a>
+    <button id="darkModeBtn">🌙 Dark Mode</button>
+    <select id="themeSelector" style="margin-left:10px;">
+      <option value="default">Default</option>
+      <option value="retro">Retro Yellow</option>
+      <option value="neon">Neon Night</option>
+    </select>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="sidebar">
+    <div class="profile-sidebar">
+      <img src="https://via.placeholder.com/80" alt="Profile">
+      <h3>@You</h3>
+      <p>Mini Twitter Enthusiast</p>
+      <div style="display:flex; gap:15px; margin-top:10px;">
+        <div><strong id="followerCount">120</strong><br>Followers</div>
+        <div><strong id="followingCount">85</strong><br>Following</div>
+      </div>
+      <button id="followBtn">Follow</button>
+    </div>
+    <div class="trends">
+      <h3>Trending Hashtags</h3>
+      <ul id="trendingList">
+        <li>#ThrowbackThursday</li>
+        <li>#MiniTwitter</li>
+        <li>#JavaScriptFun</li>
+        <li>#CodingLife</li>
+        <li>#Emojis</li>
+      </ul>
+    </div>
+    <div class="bookmarks">
+      <h3>Bookmarks</h3>
+      <ul id="bookmarkList"></ul>
+    </div>
+  </div>
+
+  <div class="feed">
+    <div class="tweet-box">
+      <textarea placeholder="What's happening?" rows="3"></textarea>
+      <div style="margin-top:5px;">
+        <button onclick="postTweet(this)" style="padding:5px 10px; border:none; border-radius:5px; background:#1da1f2; color:white; cursor:pointer;">Tweet</button>
+        <button onclick="scheduleTweet(this)" style="margin-left:5px; padding:5px 10px; border:none; border-radius:5px; background:#17bf63; color:white; cursor:pointer;">Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="rightbar"></div>
+</div>
+
+<button id="scrollTopBtn">↑</button>
+
+<script>
+/* ---------- Dark Mode & Themes ---------- */
+const darkModeBtn=document.getElementById('darkModeBtn');
+const themeSelector=document.getElementById('themeSelector');
+function setDarkMode(enabled){ if(enabled){document.body.classList.add('dark-mode'); darkModeBtn.textContent='☀️ Light Mode'; localStorage.setItem('darkMode','enabled');} else{document.body.classList.remove('dark-mode'); darkModeBtn.textContent='🌙 Dark Mode'; localStorage.setItem('darkMode','disabled');}}
+darkModeBtn.addEventListener('click',()=>{setDarkMode(!document.body.classList.contains('dark-mode'));});
+window.addEventListener('DOMContentLoaded',()=>{
+  if(localStorage.getItem('darkMode')==='enabled'){setDarkMode(true);}
+  const savedTheme=localStorage.getItem('theme'); if(savedTheme && savedTheme!=='default'){document.body.classList.add('theme-'+savedTheme); themeSelector.value=savedTheme;}
+});
+themeSelector.addEventListener('change',()=>{
+  document.body.classList.remove('theme-retro','theme-neon');
+  if(themeSelector.value!=='default'){document.body.classList.add('theme-'+themeSelector.value);}
+  localStorage.setItem('theme',themeSelector.value);
+});
+
+/* ---------- Followers ---------- */
+const followBtn=document.getElementById('followBtn');
+const followerCount=document.getElementById('followerCount');
+followBtn.addEventListener('click',()=>{
+  let count=parseInt(followerCount.textContent);
+  if(followBtn.textContent==='Follow'){count++; followBtn.textContent='Following'; followBtn.style.backgroundColor='#657786';}
+  else{count--; followBtn.textContent='Follow'; followBtn.style.backgroundColor='#1da1f2';}
+  followerCount.textContent=count;
+});
+
+/* ---------- Scroll-to-Top ---------- */
+const scrollBtn=document.getElementById('scrollTopBtn');
+window.addEventListener('scroll',()=>{scrollBtn.style.display=(window.scrollY>300)?'block':'none';});
+scrollBtn.addEventListener('click',()=>{window.scrollTo({top:0,behavior:'smooth'});});
+
+/* ---------- Sample Tweets ---------- */
+const sampleTweets=["Just coding some Mini Twitter! #javascript","Throwback to classic Twitter days 😎","Love emojis! 😂🔥 #fun","Hello world! 🌍 #firstTweet","Mini Twitter is alive! 🥳 #codingFun"];
+const feed=document.querySelector('.feed');
+function linkify(text){return text.replace(/#(\w+)/g,'<a href="#">#$1</a>').replace(/@(\w+)/g,'<a href="#">@$1</a>');}
+
+/* ---------- Post Tweet ---------- */
+function postTweet(btn){
+  const textarea=btn.parentElement.parentElement.querySelector('textarea');
+  if(!textarea.value.trim()) return;
+  const now=Date.now();
+  const newTweet=document.createElement('div');
+  newTweet.classList.add('tweet','new-tweet','new-highlight');
+  newTweet.dataset.time=now;
+  newTweet.innerHTML=`
+    <img src="https://via.placeholder.com/48" alt="Profile">
+    <div class="tweet-content">
+      <div class="tweet-header"><h3>@You</h3><span class="timestamp" data-time="${now}">Just now</span></div>
+      <p>${linkify(textarea.value)}</p>
+      <div class="tweet-details"><span>💬 0 Replies</span><span>🔁 0 Retweets</span><span>❤️ 0 Likes</span></div>
+      <div class="tweet-actions">
+        <span onclick="toggleReply(this)">💬 Reply</span>
+        <span onclick="incrementCounter(this)">🔁 Retweet</span>
+        <span onclick="incrementCounter(this)">❤️ Like</span>
+        <span onclick="bookmarkTweet(this)">🔖</span>
+      </div>
+      <div class="reply-box"><textarea placeholder="Reply..."></textarea><button onclick="postReply(this)">Reply</button><span class="typing-indicator">@You is typing...</span></div>
+    </div>`;
+  feed.insertBefore(newTweet, feed.querySelector('.tweet-box').nextSibling);
+  textarea.value='';
+  setTimeout(()=>{newTweet.classList.remove('new-tweet','new-highlight');},1000);
+}
+
+/* ---------- Bookmarks ---------- */
+const bookmarkList=document.getElementById('bookmarkList');
+function bookmarkTweet(el){
+  const tweetContent=el.closest('.tweet').querySelector('.tweet-content p').textContent;
+  const listItem=document.createElement('li'); listItem.textContent=tweetContent; bookmarkList.appendChild(listItem);
+  el.classList.add('bookmark-animate'); setTimeout(()=>{el.classList.remove('bookmark-animate');},300);
+}
+
+/* ---------- Tweet Scheduling ---------- */
+function scheduleTweet(btn){
+  const textarea=btn.parentElement.parentElement.querySelector('textarea');
+  if(!textarea.value.trim()) return;
+  let time=prompt("Enter delay in seconds for the tweet to post:");
+  time=parseInt(time);
+  if(isNaN(time) || time<=0) return alert("Invalid time!");
+  const content=textarea.value; textarea.value=''; alert(`Tweet scheduled in ${time} seconds!`);
+  setTimeout(()=>{
+    const now=Date.now();
+    const newTweet=document.createElement('div');
+    newTweet.classList.add('tweet','scheduled','new-highlight'); newTweet.dataset.time=now;
+    newTweet.innerHTML=`
+      <img src="https://via.placeholder.com/48" alt="Profile">
+      <div class="tweet-content">
+        <div class="tweet-header"><h3>@You</h3><span class="timestamp" data-time="${now}">Just now</span></div>
+        <p>${linkify(content)}</p>
+        <div class="tweet-details"><span>💬 0 Replies</span><span>🔁 0 Retweets</span><span>❤️ 0 Likes</span></div>
+        <div class="tweet-actions">
+          <span onclick="toggleReply(this)">💬 Reply</span>
+          <span onclick="incrementCounter(this)">🔁 Retweet</span>
+          <span onclick="incrementCounter(this)">❤️ Like</span>
+          <span onclick="bookmarkTweet(this)">🔖</span>
+        </div>
+        <div class="reply-box"><textarea placeholder="Reply..."></textarea><button onclick="postReply(this)">Reply</button><span class="typing-indicator">@You is typing...</span></div>
+      </div>`;
+    feed.insertBefore(newTweet, feed.querySelector('.tweet-box').nextSibling);
+    setTimeout(()=>{newTweet.classList.remove('scheduled','new-highlight');},1000);
+  },time*1000);
+}
+
+/* ---------- Replies ---------- */
+function toggleReply(el){ const box=el.closest('.tweet').querySelector('.reply-box'); box.style.display=(box.style.display==='flex')?'none':'flex'; }
+function postReply(btn){ const textarea=btn.parentElement.querySelector('textarea'); if(!textarea.value.trim()) return; const replyDiv=document.createElement('div'); replyDiv.classList.add('replyDiv','new-reply'); const now=Date.now(); replyDiv.innerHTML=`<strong>@You</strong>: ${linkify(textarea.value)} <span class="timestamp" data-time="${now}">Just now</span>`; btn.parentElement.appendChild(replyDiv); textarea.value=''; setTimeout(()=>{replyDiv.classList.remove('new-reply');},300); }
+
+/* ---------- Like/Retweet ---------- */
+function incrementCounter(el){ let parts=el.textContent.trim().split(' '), count=parseInt(parts[1])||0; count++; el.textContent=`${parts[0]} ${count}`; if(el.textContent.includes('❤️')) el.classList.add('animate'); else if(el.textContent.includes('🔁')) el.classList.add('retweet','animate'); setTimeout(()=>{el.classList.remove('animate','retweet');},300); }
+
+/* ---------- Typing Indicator ---------- */
+document.addEventListener('input',e=>{ if(e.target.matches('.reply-box textarea')){ const indicator=e.target.parentElement.querySelector('.typing-indicator'); indicator.style.display='inline'; clearTimeout(e.target.dataset.timeout); e.target.dataset.timeout=setTimeout(()=>{indicator.style.display='none';},1500); }});
+
+/* ---------- Live Timestamps ---------- */
+function updateTimestamps(){ document.querySelectorAll('.timestamp').forEach(ts=>{ const diff=Math.floor((Date.now()-parseInt(ts.dataset.time))/1000); let display='Just now'; if(diff<60) display='Just now'; else if(diff<3600) display=Math.floor(diff/60)+'m ago'; else if(diff<86400) display=Math.floor(diff/3600)+'h ago'; else display=Math.floor(diff/86400)+'d ago'; ts.textContent=display; }); }
+setInterval(updateTimestamps,30000); updateTimestamps();
+</script>
+
+</body>
+</html>
